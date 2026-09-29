@@ -251,6 +251,30 @@ def main():
     open("site/payload.bin", "wb").write(encrypt(page.encode()))
     print(f"calls cached: {len(calls)}, agent calls: {len(agent)}, days: {len(data['days'])}, "
           f"group size: {len(people)}")
+    match_report(calls, agent)
+
+
+def match_report(calls, agent):
+    """Counts only: how many agent calls per day line up with a phone-system call, and on which kind of line."""
+    idx = {}
+    for c in calls.values():
+        idx.setdefault(c["from"], []).append(c)
+    stats = {}
+    for a in agent.values():
+        day = (datetime.fromtimestamp(a["ms"] / 1000, timezone.utc) + UTC_OFFSET).strftime("%m-%d")
+        s = stats.setdefault(day, [0, 0, 0, 0])
+        s[0] += 1
+        near = [c for c in idx.get(a["from"], [])
+                if abs(utc(c["t"]).replace(tzinfo=timezone.utc).timestamp() * 1000 - a["ms"]) < 600_000]
+        if not near:
+            s[3] += 1
+        elif any(c["to"] in LINES for c in near):
+            s[1] += 1
+        else:
+            s[2] += 1
+    for day in sorted(stats)[-10:]:
+        t, lsa, other, none = stats[day]
+        print(f"match {day}: agent={t} lsa_line={lsa} other_line={other} no_match={none}")
 
 
 if __name__ == "__main__":
