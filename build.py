@@ -76,7 +76,10 @@ def pull_calls(calls):
     """Newest first until we pass the cutoff. Recent calls are re-read because the
     disposition (and so who answered) is written some time after the call."""
     back = datetime.now(timezone.utc) - timedelta(hours=36)
-    stop = FIRST_DAY + "T04:00:00Z" if not calls else back.strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = FIRST_DAY + "T04:00:00Z"
+    # full pass when the cache is empty or does not reach back to FIRST_DAY yet
+    oldest = min((c["t"] for c in calls.values()), default=None)
+    stop = start if not oldest or oldest > start else back.strftime("%Y-%m-%dT%H:%M:%SZ")
     for page in range(1, 500):
         rows = hcp(f"call_logs?page={page}&page_size=200"
                    "&sort_direction=desc&sort_column=started_at").get("data") or []
@@ -96,7 +99,9 @@ def pull_calls(calls):
 
 def pull_agent(agent):
     first = datetime.strptime(FIRST_DAY, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    since = first if not agent else datetime.now(timezone.utc) - timedelta(hours=36)
+    oldest = min((a["ms"] for a in agent.values()), default=None)
+    full = not oldest or oldest > first.timestamp() * 1000 + 86_400_000
+    since = first if full else datetime.now(timezone.utc) - timedelta(hours=36)
     key, page_key = os.environ["RETELL_KEY"], None
     while True:
         body = {"limit": 1000, "sort_order": "ascending",
