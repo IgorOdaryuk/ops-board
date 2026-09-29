@@ -81,8 +81,9 @@ def pull_calls(calls):
     oldest = min((c["t"] for c in calls.values()), default=None)
     stop = start if not oldest or oldest > start else back.strftime("%Y-%m-%dT%H:%M:%SZ")
     for page in range(1, 500):
-        rows = hcp(f"call_logs?page={page}&page_size=200"
-                   "&sort_direction=desc&sort_column=started_at").get("data") or []
+        rows = hcp(f"call_logs?page={page}&page_size=200&sort_direction=desc&sort_column=started_at"
+                   "&expand%5B%5D=call_dispositions&expand%5B%5D=call_dispositions.created_by"
+                   ).get("data") or []
         if not rows:
             break
         for r in rows:
@@ -236,10 +237,10 @@ def encrypt(plain: bytes):
 
 
 def main():
-    calls, agent = load("calls.json"), load("agent.json")
+    calls, agent = load("calls_v2.json"), load("agent.json")
     pull_calls(calls)
     pull_agent(agent)
-    store("calls.json", calls)
+    store("calls_v2.json", calls)
     store("agent.json", agent)
     people = group_members()
 
