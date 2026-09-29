@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Board</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#0f172a;--line:#e2e8f0;--acc:#2563eb;--err:#dc2626}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1120;--card:#111827;--ink:#e5e7eb;--line:#1f2937;--acc:#3b82f6;--err:#f87171}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif;display:flex;
+  min-height:100vh;align-items:center;justify-content:center}
+form{background:var(--card);border:1px solid var(--line);padding:28px;border-radius:14px;width:min(300px,calc(100vw - 32px))}
+input,button{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;font:inherit}
+input{border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+button{margin-top:12px;border:0;background:var(--acc);color:#fff;font-weight:700;cursor:pointer}
+.err{color:var(--err);font-size:13px;margin-top:10px;min-height:1em}
+</style>
+</head>
+<body>
+<form id="f"><input type="password" id="k" placeholder="Password" autocomplete="current-password" autofocus>
+<button>Open</button><div class="err" id="e"></div></form>
+<script>
+async function open_(pass){
+  const buf = new Uint8Array(await (await fetch("payload.bin", {cache:"no-store"})).arrayBuffer());
+  const salt = buf.slice(0,16), iv = buf.slice(16,28), ct = buf.slice(28);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:250000, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+  const html = new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct));
+  try { localStorage.setItem("bk", pass); } catch(e) {}
+  document.open(); document.write(html); document.close();
+}
+async function tryOpen(pass){
+  try { await open_(pass); }
+  catch(e){ document.getElementById("e").textContent = "Wrong password"; try { localStorage.removeItem("bk"); } catch(_) {} }
+}
+document.getElementById("f").onsubmit = ev => { ev.preventDefault(); tryOpen(document.getElementById("k").value); };
+const fromHash = new URLSearchParams(location.hash.slice(1)).get("k");
+if (fromHash) { history.replaceState(null, "", location.pathname + location.search); tryOpen(fromHash); }
+else { let s = null; try { s = localStorage.getItem("bk"); } catch(e) {} if (s) tryOpen(s); }
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+name: build
+
+on:
+  schedule:
+    - cron: "*/30 11-23 * * *"
+    - cron: "*/30 0-2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet cryptography
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - run: python build.py
+        env:
+          HCP_COOKIES: ${{ secrets.HCP_COOKIES }}
+          RETELL_KEY: ${{ secrets.RETELL_KEY }}
+          BOARD_KEY: ${{ secrets.BOARD_KEY }}
+          BOARD_CONFIG: ${{ secrets.BOARD_CONFIG }}
+          PAGE_HTML_B64: ${{ secrets.PAGE_HTML_B64 }}
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: cache
+          key: data-${{ github.run_id }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
