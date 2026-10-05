@@ -106,19 +106,23 @@ def pull_agent(agent):
     key, page_key = os.environ["RETELL_KEY"], None
     while True:
         body = {"limit": 1000, "sort_order": "ascending",
-                "filter_criteria": {"to_number": [AGENT],
-                                    "start_timestamp": {"lower_threshold": int(since.timestamp() * 1000)}}}
+                "filter_criteria": {"to_number": {"type": "string", "op": "eq", "value": AGENT},
+                                    "start_timestamp": {"type": "number", "op": "ge",
+                                                        "value": int(since.timestamp() * 1000)}}}
         if page_key:
             body["pagination_key"] = page_key
-        rows = get_json("https://api.retellai.com/v2/list-calls",
-                        {"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-                        json.dumps(body).encode())
-        for c in rows:
+        res = get_json("https://api.retellai.com/v3/list-calls",
+                       {"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                       json.dumps(body).encode())
+        # a bad filter comes back as an error object, not an empty list
+        if res.get("error_message") or "items" not in res:
+            raise RuntimeError("list-calls: " + str(res.get("error_message") or sorted(res)))
+        for c in res["items"]:
             if c.get("start_timestamp"):
                 agent[c["call_id"]] = {"from": c.get("from_number"), "ms": int(c["start_timestamp"])}
-        if len(rows) < 1000:
+        if not res.get("has_more"):
             return
-        page_key = rows[-1]["call_id"]
+        page_key = res["pagination_key"]
 
 
 def group_members():
