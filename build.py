@@ -9,7 +9,9 @@ Everything identifying lives in repository secrets; nothing is printed except co
 Output: site/index.html (static loader) + site/payload.bin (AES-GCM encrypted page).
 
 Env (all secrets):
-  HCP_COOKIES   session cookies, JSON object
+  COOKIE_URL    bot endpoint with the live session cookies (preferred)
+  COOKIE_KEY    key for COOKIE_URL
+  HCP_COOKIES   session cookies, JSON object; fallback when COOKIE_URL is down
   RETELL_KEY    voice agent API key
   BOARD_KEY     passphrase for the encrypted payload
   BOARD_CONFIG  JSON: {"lines": {"+1...": "label"}, "agent_number": "+1...",
@@ -49,8 +51,26 @@ def get_json(url, headers, data=None):
         return json.loads(r.read())
 
 
+_cookies = None
+
+
+def hcp_cookies():
+    """The live session from the bot that keeps it rolling; the HCP_COOKIES secret is only a fallback."""
+    global _cookies
+    if _cookies is None:
+        url, key = os.environ.get("COOKIE_URL"), os.environ.get("COOKIE_KEY")
+        if url and key:
+            try:
+                _cookies = get_json(url, {"X-Cookie-Key": key})
+            except Exception as e:
+                print(f"cookie source unavailable ({type(e).__name__}), using HCP_COOKIES")
+        if not _cookies:
+            _cookies = json.loads(os.environ["HCP_COOKIES"])
+    return _cookies
+
+
 def hcp(path):
-    ck = json.loads(os.environ["HCP_COOKIES"])
+    ck = hcp_cookies()
     return get_json("https://pro.housecallpro.com/alpha/voice/" + path, {
         "accept": "application/json",
         "x-csrf-token": ck["csrf_token"],

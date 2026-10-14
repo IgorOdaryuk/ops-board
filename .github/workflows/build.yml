@@ -35,6 +35,8 @@ jobs:
       - run: python build.py
         env:
           HCP_COOKIES: ${{ secrets.HCP_COOKIES }}
+          COOKIE_URL: ${{ secrets.COOKIE_URL }}
+          COOKIE_KEY: ${{ secrets.COOKIE_KEY }}
           RETELL_KEY: ${{ secrets.RETELL_KEY }}
           BOARD_KEY: ${{ secrets.BOARD_KEY }}
           BOARD_CONFIG: ${{ secrets.BOARD_CONFIG }}
